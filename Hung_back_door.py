@@ -391,9 +391,8 @@ if __name__ == '__main__':
 	# link_video = "/media/newhd/new_data/2019_12_8_7_23_53/cam2.avi"
 	# link_video = "/media/newhd/new_data/syncron_video/1/2019_12_13_16_54_46cam2.avi"
 	# link_video = "/media/newhd/new_data/syncron_video/2/2019_12_13_13_52_6cam2.avi"
-	if link_video != '':
-		Streaming(args).process_video(link_video)
+	if args.link_video != '':
+		Streaming(args).process_video(args.link_video)
 	else:
 		Streaming(args).process_streaming()
-
 	#python3 Hung_back_door.py --rtsp 'rtsp://admin:dou123789@10.0.0.15:554/cam/realmonitor?channel=1&subtype=0' --resize-camera 0.35 --cam-name 4 --working-lane 5

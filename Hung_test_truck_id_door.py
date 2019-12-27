@@ -620,8 +620,8 @@ if __name__ == '__main__':
 	# link_video = "/media/newhd/new_data/syncron_video/1/2019_12_13_16_54_46cam4.avi"
 	# link_video = "/media/newhd/new_data/syncron_video/2/2019_12_13_13_52_6cam4.avi"
 
-	if link_video != '':
-		Streaming(args).process_video(link_video)
+	if args.link_video != '':
+		Streaming(args).process_video(args.link_video)
 	else:
 		Streaming(args).process_streaming()
 

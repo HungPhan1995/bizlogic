@@ -1,0 +1,5 @@
+classes= 14
+train  = alt/train.txt  
+valid  = alt/test.txt  
+names = darknet/cfg_cntr_full/truck_objects.names  
+backup = backup_truck/

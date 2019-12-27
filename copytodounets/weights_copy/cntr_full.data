@@ -1,6 +1,0 @@
-classes = 37
-train  = ../cntr_full/train.txt
-valid  = ../cntr_full/test.txt
-names = /data/tuan/adt-baseline/server/darknet/cfg_cntr_full/cntr_full.names
-backup = cfg_cntr_full
-

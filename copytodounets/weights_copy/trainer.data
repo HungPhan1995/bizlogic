@@ -1,5 +1,0 @@
-classes= 39
-train  = alt_side/train.txt  
-valid  = alt_side/test.txt  
-names = /data/HuyNguyen/detect/darknet/cfg_cntr_full/objects.names  
-backup = /data/HuyNguyen/detect/darknet/backup/

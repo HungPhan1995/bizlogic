@@ -3,5 +3,5 @@ conda activate base
 pm2 start recognition_cam12.sh recognition_cam34.sh show_other_cam.sh --log-date-format "YYYY-MM-DD HH:mm:ss"
 
 # Run video 
-python  Hung_test_truck_id_door.py --link-video "Enter link video here"
-python Hung_back_door.py --link-video "Enter link video here"
+python  Hung_test_truck_id_door.py --link-video "Enter link video 3 or 4 here"
+python Hung_back_door.py --link-video "Enter link video 1 or 2 here"

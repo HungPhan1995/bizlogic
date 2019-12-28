@@ -295,7 +295,7 @@ class Streaming(Thread):
 			out = cv2.VideoWriter('output.avi', fourcc, 20.0, (int(frame_width*0.5), int(frame_height*0.5))) 
 
 		success, image = vidObj.read()
-		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 14
+		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 16
 
 		before_result = None
 		result = None
@@ -467,7 +467,8 @@ class Streaming(Thread):
 		sio.emit('top_cameras_info', result_Vu)
 
 	def check_is_truck_id(self, truck_id):
-		if truck_id[1] in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] and truck_id[2] in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']:
+		list_string_number = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] 
+		if truck_id[0] not in list_string_number and truck_id[1] in list_string_number and truck_id[2] in list_string_number:
 			return True
 		return False
 
@@ -484,128 +485,128 @@ class Streaming(Thread):
 
 		image = None
 		image = self.video_capture_cam3.read()
-		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 14
+		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 16
 
 		# count = 0
 		current_second = -1
 		old_second = -1
 		while True: 
-			# try:
-			# count += 1
-			s = time.time()
-			if current_working_lane in [1,2,3]:
-				self.cam_name = 3
-				image = self.video_capture_cam3.read()
-			elif current_working_lane in [4,5,6]:
-				self.cam_name = 4
-				image = self.video_capture_cam4.read()
-			x1, x2 = self.crop_lane(current_working_lane)
-			image = image[:,x1:x2]
-			image = cv2.resize(image, None, fx=self.resize_camera, fy=self.resize_camera)
-
-			result = processing_top_view(image, self.net, self.meta, save_folder = False, should_invert = True)
-			
-			
-			is_spread = False
-			is_truck = False
-			is_container = False
-
-			now = datetime.datetime.now()
-			current_second = now.second
-			if current_second % 5 == 0 and old_second != current_second:
-				old_second = current_second
-				show_cam(image,self.cam_name)
-
-			for element in result:
-				if element['Object'] == 'Container':
-					is_container = True
-
-				if element['Object'] == 'TruckHead':
-					is_truck = True
-					self.y_truck_head = element['Position'][1]
-					
-					truck_head_position = element['Position']
-					x,y,w,h = truck_head_position
-					image_truck_head = image[y-h//2: y+h//2, x-w//2:x+w//2]
-					if element['Truck ID'][1] > states['truck_Id_cof'] and len(element['Truck ID'][0]) == 3 and self.check_is_truck_id(element['Truck ID'][0]):
-						states['truck_Id_cof'] = element['Truck ID'][1]
-						states['truck_Id'] =  element['Truck ID'][0]
-				if element['Object']  == 'Spreader':
-					is_spread = True
-					
-
-			if is_truck == False:
-				states['count_truck_out'] += 1
-			else:
-				states['count_truck_out'] = 0
-			if len(count_n_frame['container'])== self.NUM_FRAME_MAKE_DECISION_CONTAINER:
-				count_n_frame['container'].pop(0)
-				count_n_frame['spreader'].pop(0)
-			if len(count_n_frame['truck_head']) == self.NUM_FRAME_MAKE_DECISION_TRUCK_HEAD:
-				count_n_frame['truck_head'].pop(0)
-			count_n_frame['container'].append(is_container)
-			count_n_frame['truck_head'].append(is_truck)
-			count_n_frame['spreader'].append(is_spread)
-
-
-			result_door = []
 			try:
-				result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
-			except:
-				print(datetime.datetime.now(), 'Exception door detection')
+			# count += 1
+				s = time.time()
+				if current_working_lane in [1,2,3]:
+					self.cam_name = 3
+					image = self.video_capture_cam3.read()
+				elif current_working_lane in [4,5,6]:
+					self.cam_name = 4
+					image = self.video_capture_cam4.read()
+				x1, x2 = self.crop_lane(current_working_lane)
+				image = image[:,x1:x2]
+				image = cv2.resize(image, None, fx=self.resize_camera, fy=self.resize_camera)
 
-			if len(result_door) > 0:
-				# print("push door data to Vu")
-				if is_spread and states['is_sent_door'] == False and is_container == True:
-					states['is_sent_door'] = True
-					print(datetime.datetime.now(), "push door data to Huy")
-					self.push_door_data(result_door, is_huy = True)
-				else:
-					self.push_door_data(result_door, is_huy = False)
-
-				if len(door_statistic) == 1:
-					print(datetime.datetime.now(),door_statistic)
-					self.sent_door_to_Vu(door_statistic[0])
-					old_value_door = door_statistic[0]
-				elif len(door_statistic) > 1:
-					count_true_door = door_statistic.count(True)
-					count_false_door = door_statistic.count(False)
-					if count_false_door > count_true_door and old_value_door != False:
-						old_value_door = False
-						self.sent_door_to_Vu(is_door = False)
-						print(datetime.datetime.now(),door_statistic)
-					if count_true_door > count_false_door and old_value_door != True:
-						old_value_door = True
-						self.sent_door_to_Vu(is_door = True)
-						print(datetime.datetime.now(),door_statistic)
-
-			result = self.check_sent_result()
-			if before_result == None:
-				before_result = result  
-			
-			if self.check_change(result, before_result) and self.y_truck_head >= self.MIN_Y_TRUCK_HEAD:
-				before_result = result
-				############################### SENT TO VU ##################
-				print(datetime.datetime.now(),'sent to VU')
-				result['truck_image'] = 'test.jpg'
-				sio.emit('top_cameras_info', result)
-				############################### SENT TO VU ##################
+				result = processing_top_view(image, self.net, self.meta, save_folder = False, should_invert = True)
 				
-				print("----------------sent result ------------------")
-				print(result)
-				print("----------------sent result ------------------")
+				
+				is_spread = False
+				is_truck = False
+				is_container = False
 
-				if before_truck_id != states['truck_Id'] and  states['truck_Id'] != None and len(states['truck_Id']) == 3:
-					before_truck_id = states['truck_Id']
-					if truck_head_position != None:
-						print(datetime.datetime.now(),"push_truck_id")
-						self.push_truck_id(image_truck_head, states['truck_Id'])
+				now = datetime.datetime.now()
+				current_second = now.second
+				if current_second % 5 == 0 and old_second != current_second:
+					old_second = current_second
+					show_cam(image,self.cam_name)
 
-			if states['count_truck_out'] == self.COUNT_TRUCK_OUT and self.y_truck_head >= self.MIN_Y_TRUCK_HEAD:
-				print(datetime.datetime.now(),'Reset default state')
-				self.default_state()
-			# except:
-			# 	print('There are something wrong')
+				for element in result:
+					if element['Object'] == 'Container':
+						is_container = True
+
+					if element['Object'] == 'TruckHead':
+						is_truck = True
+						self.y_truck_head = element['Position'][1]
+						
+						truck_head_position = element['Position']
+						x,y,w,h = truck_head_position
+						image_truck_head = image[y-h//2: y+h//2, x-w//2:x+w//2]
+						if element['Truck ID'][1] > states['truck_Id_cof'] and len(element['Truck ID'][0]) == 3 and self.check_is_truck_id(element['Truck ID'][0]):
+							states['truck_Id_cof'] = element['Truck ID'][1]
+							states['truck_Id'] =  element['Truck ID'][0]
+					if element['Object']  == 'Spreader':
+						is_spread = True
+						
+
+				if is_truck == False:
+					states['count_truck_out'] += 1
+				else:
+					states['count_truck_out'] = 0
+				if len(count_n_frame['container'])== self.NUM_FRAME_MAKE_DECISION_CONTAINER:
+					count_n_frame['container'].pop(0)
+					count_n_frame['spreader'].pop(0)
+				if len(count_n_frame['truck_head']) == self.NUM_FRAME_MAKE_DECISION_TRUCK_HEAD:
+					count_n_frame['truck_head'].pop(0)
+				count_n_frame['container'].append(is_container)
+				count_n_frame['truck_head'].append(is_truck)
+				count_n_frame['spreader'].append(is_spread)
+
+
+				result_door = []
+				try:
+					result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
+				except:
+					print(datetime.datetime.now(), 'Exception door detection')
+
+				if len(result_door) > 0:
+					# print("push door data to Vu")
+					if is_spread and states['is_sent_door'] == False and is_container == True:
+						states['is_sent_door'] = True
+						print(datetime.datetime.now(), "push door data to Huy")
+						self.push_door_data(result_door, is_huy = True)
+					else:
+						self.push_door_data(result_door, is_huy = False)
+
+					if len(door_statistic) == 1:
+						print(datetime.datetime.now(),door_statistic)
+						self.sent_door_to_Vu(door_statistic[0])
+						old_value_door = door_statistic[0]
+					elif len(door_statistic) > 1:
+						count_true_door = door_statistic.count(True)
+						count_false_door = door_statistic.count(False)
+						if count_false_door > count_true_door and old_value_door != False:
+							old_value_door = False
+							self.sent_door_to_Vu(is_door = False)
+							print(datetime.datetime.now(),door_statistic)
+						if count_true_door > count_false_door and old_value_door != True:
+							old_value_door = True
+							self.sent_door_to_Vu(is_door = True)
+							print(datetime.datetime.now(),door_statistic)
+
+				result = self.check_sent_result()
+				if before_result == None:
+					before_result = result  
+				
+				if self.check_change(result, before_result) and self.y_truck_head >= self.MIN_Y_TRUCK_HEAD:
+					before_result = result
+					############################### SENT TO VU ##################
+					print(datetime.datetime.now(),'sent to VU')
+					result['truck_image'] = 'test.jpg'
+					sio.emit('top_cameras_info', result)
+					############################### SENT TO VU ##################
+					
+					print("----------------sent result ------------------")
+					print(result)
+					print("----------------sent result ------------------")
+
+					if before_truck_id != states['truck_Id'] and  states['truck_Id'] != None and len(states['truck_Id']) == 3:
+						before_truck_id = states['truck_Id']
+						if truck_head_position != None:
+							print(datetime.datetime.now(),"push_truck_id")
+							self.push_truck_id(image_truck_head, states['truck_Id'])
+
+				if states['count_truck_out'] == self.COUNT_TRUCK_OUT and self.y_truck_head >= self.MIN_Y_TRUCK_HEAD:
+					print(datetime.datetime.now(),'Reset default state')
+					self.default_state()
+			except:
+				print('There are something wrong truck id door')
 
 if __name__ == '__main__':
 	args = None

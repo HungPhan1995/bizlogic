@@ -322,63 +322,64 @@ class Streaming(Thread):
 		old_second = -1
 		count_no_door = 0
 		while True: 
-			# try:
-			# count += 1
-			s = time.time()
-			# image = self.video_capture1.read()
-
-			if current_working_lane in [1,2,3]:
-				self.cam_name = 1
-				image = self.video_capture_cam1.read()
-			elif current_working_lane in [4,5,6]:
-				self.cam_name = 2
-				image = self.video_capture_cam2.read()
-			
-			x1, x2 = self.crop_lane(current_working_lane)
-			image = image[:,x1:x2]
-
-			
-			image = cv2.resize(image, None, fx=self.resize_camera, fy=self.resize_camera)
-
-			result = processing_top_view(image, self.net, self.meta, save_folder = False, should_invert = True)
-			is_spread = False
-			# if len(result):
-				# print(result)
-			now = datetime.datetime.now()
-			current_second = now.second
-			if current_second % 5 == 0 and old_second != current_second:
-				old_second = current_second
-				show_cam(image,self.cam_name)
-
-			for element in result:
-				if element['Object']  == 'Spreader':
-					is_spread = True
-					break
-			if is_spread:
-				states['count_spreader_in'] += 1
-			else:
-				states['count_spreader_in'] = 0
-
-			result_door = []
 			try:
-				result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
-				if len(result_door) > 0:
-					if is_spread and states['count_spreader_in'] == self.COUNT_SPREADER_IN:
-						print("push door data to server")
-						self.push_door_data(result_door, is_huy = True)
-					else:
-						self.push_door_data(result_door, is_huy = False)
-					self.check_and_sent_door()
-				elif len(result_door) == 0:
-					count_no_door += 1
+			# count += 1
+				s = time.time()
+				# image = self.video_capture1.read()
 
-				if count_no_door == 10:
-					count_no_door = 0
-					door_statistic = []
-					old_value_door = None
+				if current_working_lane in [1,2,3]:
+					self.cam_name = 1
+					image = self.video_capture_cam1.read()
+				elif current_working_lane in [4,5,6]:
+					self.cam_name = 2
+					image = self.video_capture_cam2.read()
+				
+				x1, x2 = self.crop_lane(current_working_lane)
+				image = image[:,x1:x2]
+
+				
+				image = cv2.resize(image, None, fx=self.resize_camera, fy=self.resize_camera)
+
+				result = processing_top_view(image, self.net, self.meta, save_folder = False, should_invert = True)
+				is_spread = False
+				# if len(result):
+					# print(result)
+				now = datetime.datetime.now()
+				current_second = now.second
+				if current_second % 5 == 0 and old_second != current_second:
+					old_second = current_second
+					show_cam(image,self.cam_name)
+
+				for element in result:
+					if element['Object']  == 'Spreader':
+						is_spread = True
+						break
+				if is_spread:
+					states['count_spreader_in'] += 1
+				else:
+					states['count_spreader_in'] = 0
+
+				result_door = []
+				try:
+					result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
+					if len(result_door) > 0:
+						if is_spread and states['count_spreader_in'] == self.COUNT_SPREADER_IN:
+							print("push door data to server")
+							self.push_door_data(result_door, is_huy = True)
+						else:
+							self.push_door_data(result_door, is_huy = False)
+						self.check_and_sent_door()
+					elif len(result_door) == 0:
+						count_no_door += 1
+
+					if count_no_door == 10:
+						count_no_door = 0
+						door_statistic = []
+						old_value_door = None
+				except:
+					print('Exception detect door error')
 			except:
-				print('Exception detect door error')
-
+				print("There are something wrong back door")
 
 if __name__ == '__main__':
 	args = None

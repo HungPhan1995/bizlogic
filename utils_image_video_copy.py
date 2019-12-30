@@ -412,32 +412,52 @@ def processing_top_view(frame, net, meta, save_folder = False, should_invert = F
                 str_out.append({"Object": className, "Position": [x, y, w, h], "Confidence": conf, "Truck ID": (truck_id, cf)})
     return str_out
 
-def processing_door(frame, net, meta, model_door, save_folder):
-    arr = detect(net, meta, frame)
-    processing_arr = convert(arr, frame)
+# def processing_door(frame, net, meta, model_door, save_folder):
+#     arr = detect(net, meta, frame)
+#     processing_arr = convert(arr, frame)
+#     objs = []
+#     for item in processing_arr:
+#         className = item[0]
+#         x = item[1]
+#         y = item[2]
+#         w = item[3]
+#         h = item[4]
+#         conf = item[5]
+
+#         cnt_img_origin = np.zeros((0, 0, 0))
+#         if className == "Container":
+#             try:
+#                 cnt_img_origin = frame[(y-(h//2))-20:(y+(h//2))+20, (x-(w//2))-20:(x+(w//2))+20]
+#             except:
+#                 print('Exception expand door')
+#                 cnt_img_origin = frame[(y-(h//2)):(y+(h//2)), (x-(w//2)):(x+(w//2))]
+
+#             if cnt_img_origin.shape[0] > 0:
+#                 cnt_img = cv2.resize(cnt_img_origin, (300, 300), interpolation = cv2.INTER_AREA)
+#                 cnt_img = cnt_img.reshape(1,300,300,3)
+#                 res = model_door.predict(cnt_img)[0][0]
+#                 objs.append((int(res), cnt_img_origin))
+#     return objs
+
+
+def processing_door_v2(frame,position, net, meta, model_door):
     objs = []
-    for item in processing_arr:
-        className = item[0]
-        x = item[1]
-        y = item[2]
-        w = item[3]
-        h = item[4]
-        conf = item[5]
+    x,y,w,h = position
+    cnt_img_origin = np.zeros((0, 0, 0))
+    try:
+        cnt_img_origin = frame[(y-(h//2))-20:(y+(h//2))+20, (x-(w//2))-20:(x+(w//2))+20]
+    except:
+        print('Exception expand door')
+        cnt_img_origin = frame[(y-(h//2)):(y+(h//2)), (x-(w//2)):(x+(w//2))]
 
-        cnt_img_origin = np.zeros((0, 0, 0))
-        if className == "Container":
-            try:
-                cnt_img_origin = frame[(y-(h//2))-20:(y+(h//2))+20, (x-(w//2))-20:(x+(w//2))+20]
-            except:
-                print('Exception expand door')
-                cnt_img_origin = frame[(y-(h//2)):(y+(h//2)), (x-(w//2)):(x+(w//2))]
-
-            if cnt_img_origin.shape[0] > 0:
-                cnt_img = cv2.resize(cnt_img_origin, (300, 300), interpolation = cv2.INTER_AREA)
-                cnt_img = cnt_img.reshape(1,300,300,3)
-                res = model_door.predict(cnt_img)[0][0]
-                objs.append((int(res), cnt_img_origin))
+    if cnt_img_origin.shape[0] > 0:
+        cnt_img = cv2.resize(cnt_img_origin, (300, 300), interpolation = cv2.INTER_AREA)
+        cnt_img = cnt_img.reshape(1,300,300,3)
+        res = model_door.predict(cnt_img)[0][0]
+        objs.append((int(res), cnt_img_origin))
     return objs
+
+
 
 def processing_view(frame, net, meta, net_ctnr, meta_ctnr, index):
     arr = detect(net, meta, frame)

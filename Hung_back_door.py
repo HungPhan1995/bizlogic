@@ -10,7 +10,7 @@ import base64
 import timeit
 import shutil
 
-from utils_image_video_copy import processing, processing_view, load_model, load_model_ctnr_no, drawCandidate, drawCandidate_top_view, load_model_truck, processing_top_view, processing_door, load_model_door
+from utils_image_video_copy import processing, processing_view, load_model, load_model_ctnr_no, drawCandidate, drawCandidate_top_view, load_model_truck, processing_top_view, processing_door_v2, load_model_door
 
 import json
 import requests
@@ -258,7 +258,16 @@ class Streaming(Thread):
 				old_second = current_second
 				show_cam(image,self.cam_name)
 
+			result_door = []
 			for element in result:
+				if element['Object'] == 'Container':
+					is_container = True
+					Container_position = element['Position']
+					try:
+						result_door = processing_door_v2(image, Container_position, self.net, self.meta, self.door_model)
+					except:
+						print('Exception door detection')
+
 				if element['Object']  == 'Spreader':
 					is_spread = True
 					break
@@ -268,9 +277,9 @@ class Streaming(Thread):
 				states['count_spreader_in'] = 0
 
 
-			result_door = []
+			
 			try:
-				result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
+				# result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
 				if len(result_door) > 0:
 					if is_spread and states['count_spreader_in'] == self.COUNT_SPREADER_IN:
 						print("push door data to server")
@@ -350,7 +359,15 @@ class Streaming(Thread):
 					old_second = current_second
 					show_cam(image,self.cam_name)
 
+				result_door = []
 				for element in result:
+					if element['Object'] == 'Container':
+						is_container = True
+						Container_position = element['Position']
+						try:
+							result_door = processing_door_v2(image, Container_position, self.net, self.meta, self.door_model)
+						except:
+							print('Exception door detection')
 					if element['Object']  == 'Spreader':
 						is_spread = True
 						break
@@ -358,10 +375,8 @@ class Streaming(Thread):
 					states['count_spreader_in'] += 1
 				else:
 					states['count_spreader_in'] = 0
-
-				result_door = []
 				try:
-					result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
+					# result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
 					if len(result_door) > 0:
 						if is_spread and states['count_spreader_in'] == self.COUNT_SPREADER_IN:
 							print("push door data to server")

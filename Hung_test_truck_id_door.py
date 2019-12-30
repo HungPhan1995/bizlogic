@@ -10,7 +10,7 @@ import base64
 import timeit
 import shutil
 
-from utils_image_video_copy import processing, processing_view, load_model, load_model_ctnr_no, drawCandidate, drawCandidate_top_view, load_model_truck, processing_top_view, processing_door, load_model_door
+from utils_image_video_copy import processing, processing_view, load_model, load_model_ctnr_no, drawCandidate, drawCandidate_top_view, load_model_truck, processing_top_view, processing_door_v2, load_model_door
 
 import json
 import requests
@@ -164,9 +164,9 @@ class Streaming(Thread):
 		if sum (count_n_frame['truck_head']) > self.NUM_FRAME_MAKE_DECISION_TRUCK_HEAD *0.7:
 			is_truck_head = True
 		
-		if  is_truck_head == False:
-			states['truck_Id'] = None
-			states['truck_Id_cof'] = 0
+		# if  is_truck_head == False:
+		# 	states['truck_Id'] = None
+		# 	states['truck_Id_cof'] = 0
 			
 		is_container = False
 		if sum(count_n_frame['container']) > self.NUM_FRAME_MAKE_DECISION_CONTAINER // 2:
@@ -295,7 +295,7 @@ class Streaming(Thread):
 			out = cv2.VideoWriter('output.avi', fourcc, 20.0, (int(frame_width*0.5), int(frame_height*0.5))) 
 
 		success, image = vidObj.read()
-		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 16
+		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 2 * self.resize_camera + image.shape[0] // 8 * self.resize_camera
 
 		before_result = None
 		result = None
@@ -307,17 +307,17 @@ class Streaming(Thread):
 		# image = self.video_capture_cam3.read()
 		# self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 14
 
-		# count = 0
+		count = 0
 		current_second = -1
 		old_second = -1
 
 		number_of_frames = vidObj.get(cv2.CAP_PROP_FRAME_COUNT )
 		while success: 
 			# try:
-			# count += 1
+			count += 1
 			s = time.time()
 			time_in_100ms = time.time()*1000/100 
-			frame_to_read = int(time_in_100ms)%number_of_frames
+			frame_to_read = int(time_in_100ms - 7*30*60)%number_of_frames
 			# print('Frame to read: ',  frame_to_read)
 			vidObj.set(cv2.CAP_PROP_POS_FRAMES, int(frame_to_read))
 			success, image = vidObj.read()
@@ -347,9 +347,16 @@ class Streaming(Thread):
 				old_second = current_second
 				show_cam(image,self.cam_name)
 
+			result_door = []
+
 			for element in result:
 				if element['Object'] == 'Container':
 					is_container = True
+					Container_position = element['Position']
+					try:
+						result_door = processing_door_v2(image, Container_position, self.net, self.meta, self.door_model)
+					except:
+						print('Exception door detection')
 
 				if element['Object'] == 'TruckHead':
 					is_truck = True
@@ -358,6 +365,9 @@ class Streaming(Thread):
 					truck_head_position = element['Position']
 					x,y,w,h = truck_head_position
 					image_truck_head = image[y-h//2: y+h//2, x-w//2:x+w//2]
+					# print(datetime.datetime.now(), element['Truck ID'][0], element['Truck ID'][1])
+					# print(states['truck_Id'])
+
 					if element['Truck ID'][1] > states['truck_Id_cof'] and len(element['Truck ID'][0]) == 3 and self.check_is_truck_id(element['Truck ID'][0]):
 						states['truck_Id_cof'] = element['Truck ID'][1]
 						states['truck_Id'] =  element['Truck ID'][0]
@@ -379,11 +389,11 @@ class Streaming(Thread):
 			count_n_frame['spreader'].append(is_spread)
 
 
-			result_door = []
-			try:
-				result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
-			except:
-				print('Exception door detection')
+			# result_door = []
+			# try:
+			# 	result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
+			# except:
+			# 	print('Exception door detection')
 
 			if len(result_door) > 0:
 				# print("push door data to Vu")
@@ -439,7 +449,8 @@ class Streaming(Thread):
 			if states['count_truck_out'] == self.COUNT_TRUCK_OUT and self.y_truck_head >= self.MIN_Y_TRUCK_HEAD:
 				print('Reset default state')
 				self.default_state()
-
+			if count %100 == 0:
+				print('time per frame', time.time() - s)
 			if make_video:
 				out.write(image)
 
@@ -485,8 +496,8 @@ class Streaming(Thread):
 
 		image = None
 		image = self.video_capture_cam3.read()
-		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 16
-
+		# self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 16
+		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 2 * self.resize_camera + image.shape[0] // 8 * self.resize_camera
 		# count = 0
 		current_second = -1
 		old_second = -1
@@ -517,9 +528,15 @@ class Streaming(Thread):
 					old_second = current_second
 					show_cam(image,self.cam_name)
 
+				result_door = []
 				for element in result:
 					if element['Object'] == 'Container':
 						is_container = True
+						Container_position = element['Position']
+						try:
+							result_door = processing_door_v2(image, Container_position, self.net, self.meta, self.door_model)
+						except:
+							print('Exception door detection')
 
 					if element['Object'] == 'TruckHead':
 						is_truck = True
@@ -528,6 +545,8 @@ class Streaming(Thread):
 						truck_head_position = element['Position']
 						x,y,w,h = truck_head_position
 						image_truck_head = image[y-h//2: y+h//2, x-w//2:x+w//2]
+
+						
 						if element['Truck ID'][1] > states['truck_Id_cof'] and len(element['Truck ID'][0]) == 3 and self.check_is_truck_id(element['Truck ID'][0]):
 							states['truck_Id_cof'] = element['Truck ID'][1]
 							states['truck_Id'] =  element['Truck ID'][0]
@@ -549,11 +568,11 @@ class Streaming(Thread):
 				count_n_frame['spreader'].append(is_spread)
 
 
-				result_door = []
-				try:
-					result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
-				except:
-					print(datetime.datetime.now(), 'Exception door detection')
+				# result_door = []
+				# try:
+				# 	result_door = processing_door(image, self.net, self.meta, self.door_model, save_folder = False)
+				# except:
+				# 	print(datetime.datetime.now(), 'Exception door detection')
 
 				if len(result_door) > 0:
 					# print("push door data to Vu")

@@ -46,33 +46,36 @@ class Streaming(Thread):
 	def __init__(self, args):
 		Thread.__init__(self)
 		self.args = args
-		self.cam_name_front = 3
-		self.cam_name_back = 1
+		# self.cam_name_front = 3
+		# self.cam_name_back = 1
 		self.video_capture_cam1 = VideoStream(src='rtsp://admin:SPVS@@15411@192.168.2.21/profile3/media.smp').start()
 		self.video_capture_cam2 = VideoStream(src='rtsp://admin:SPVS@@15411@192.168.2.22/profile3/media.smp').start()
 		self.video_capture_cam3 = VideoStream(src='rtsp://admin:SPVS@@15411@192.168.2.23/profile3/media.smp').start()
 		self.video_capture_cam4 = VideoStream(src='rtsp://admin:SPVS@@15411@192.168.2.24/profile3/media.smp').start()
 	def process_streaming(self):
+		global current_working_lane
 		current_second = -1
 		old_second = -1
+		cam_name_front = 3
+		cam_name_back = 1
 		while True: 
 			try:
 				if current_working_lane in [4,5,6]:
-					self.cam_name_front = 3
-					self.cam_name_back = 1
+					cam_name_front = 3
+					cam_name_back = 1
 					image_front = self.video_capture_cam3.read()
 					image_back = self.video_capture_cam1.read()
 				elif current_working_lane in [1,2,3]:
-					self.cam_name_front = 4
-					self.cam_name_back = 2
+					cam_name_front = 4
+					cam_name_back = 2
 					image_front = self.video_capture_cam4.read()
 					image_back = self.video_capture_cam2.read()
 				now = datetime.datetime.now()
 				current_second = now.second
 				if current_second % 5 == 0 and old_second != current_second:
 					old_second = current_second
-					show_cam(image_front,self.cam_name_front)
-					show_cam(image_back,self.cam_name_back)
+					show_cam(image_front, cam_name_front)
+					show_cam(image_back, cam_name_back)
 			except:
 				print("There are something wrong show other camera")
 if __name__ == '__main__':

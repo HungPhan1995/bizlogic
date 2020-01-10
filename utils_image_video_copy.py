@@ -440,7 +440,7 @@ def processing_top_view(frame, net, meta, save_folder = False, should_invert = F
 #     return objs
 
 
-def processing_door_v2(frame,position, net, meta, model_door):
+def processing_door_v2(frame, position, model_door):
     objs = []
     x,y,w,h = position
     cnt_img_origin = np.zeros((0, 0, 0))

@@ -135,6 +135,7 @@ class Streaming(Thread):
 		# self.COUNT_TRUCK_OUT = 10
 		self.MIN_Y_TRUCK_HEAD = 1080//4 + 50
 		self.NUM_FRAME_MAKE_DECISION_CONTAINER = 7
+		# self.NUM_FRAME_MAKE_DECISION_TRUCK_HEAD = 7
 		self.NUM_FRAME_MAKE_DECISION_TRUCK_HEAD = 40
 		# self.NUM_FRAME_MAKE_DECISION = 7
 
@@ -142,19 +143,18 @@ class Streaming(Thread):
 		self.y_truck_head = - sys.maxsize
 		self.net, self.meta = load_model_truck()
 		self.door_model = load_model_door()
-		#self.working_lane = 5
 
-		# self.crop_lane_x1,self.crop_lane_x2 = None, None
 
 
 	def default_state(self):
 		global states, count_n_frame, door_statistic, old_value_door
-		states = {'truck_Id': None,'truck_Id_cof': 0,'count_truck_out': 0, 'is_sent_door':False}
+		states = {'truck_Id': None,'truck_Id_cof': 0,'count_truck_out': 0, 'is_sent_door':False, 'is_sent_door_in_center': False}
 		count_n_frame = {'container':[], 'truck_head':[], 'spreader':[]}
 		door_statistic = []
 		old_value_door = None
 
 	def check_sent_result(self):
+		global count_n_frame
 		is_spreader_on_camera = False
 		
 		if sum(count_n_frame['spreader']) > self.NUM_FRAME_MAKE_DECISION_CONTAINER// 2:
@@ -164,9 +164,9 @@ class Streaming(Thread):
 		if sum (count_n_frame['truck_head']) > self.NUM_FRAME_MAKE_DECISION_TRUCK_HEAD *0.7:
 			is_truck_head = True
 		
-		# if  is_truck_head == False:
-		# 	states['truck_Id'] = None
-		# 	states['truck_Id_cof'] = 0
+		if  is_truck_head == False:
+			states['truck_Id'] = None
+			states['truck_Id_cof'] = 0
 			
 		is_container = False
 		if sum(count_n_frame['container']) > self.NUM_FRAME_MAKE_DECISION_CONTAINER // 2:
@@ -184,6 +184,7 @@ class Streaming(Thread):
 				count += 1
 				break
 		return count
+
 	def push_door_data(self, result, is_huy = True):
 		global door_statistic
 		now = datetime.datetime.now()
@@ -274,7 +275,7 @@ class Streaming(Thread):
 			print('exception push truck_id')
 			
 	def process_video(self, link_video):
-		global states, door_statistic, old_value_door
+		global states, door_statistic, old_value_door, count_n_frame
 		vidObj = cv2.VideoCapture(link_video) 
 		success = 1
 		self.default_state()
@@ -295,7 +296,8 @@ class Streaming(Thread):
 			out = cv2.VideoWriter('output.avi', fourcc, 20.0, (int(frame_width*0.5), int(frame_height*0.5))) 
 
 		success, image = vidObj.read()
-		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 2 * self.resize_camera + image.shape[0] // 8 * self.resize_camera
+		# self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 14
+		self.MIN_Y_TRUCK_HEAD = (image.shape[0] / 2 * self.resize_camera) + ((image.shape[0] / 8) * self.resize_camera)
 
 		before_result = None
 		result = None
@@ -303,7 +305,7 @@ class Streaming(Thread):
 		truck_head_position = None
 		is_container_before = False
 
-		image = None
+		# image = None
 		# image = self.video_capture_cam3.read()
 		# self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 14
 
@@ -317,11 +319,10 @@ class Streaming(Thread):
 			count += 1
 			s = time.time()
 			time_in_100ms = time.time()*1000/100 
-			frame_to_read = int(time_in_100ms - 7*30*60)%number_of_frames
+			frame_to_read = int(time_in_100ms + 4*30*60)%number_of_frames
 			# print('Frame to read: ',  frame_to_read)
 			vidObj.set(cv2.CAP_PROP_POS_FRAMES, int(frame_to_read))
 			success, image = vidObj.read()
-
 			# success, image = vidObj.read()
 			# if current_working_lane in [1,2,3]:
 			# 	self.cam_name = 3
@@ -329,7 +330,7 @@ class Streaming(Thread):
 			# elif current_working_lane in [4,5,6]:
 			# 	self.cam_name = 4
 			# 	image = self.video_capture_cam4.read()
-			x1, x2 = 0,0 
+			# x1, x2 = 0,0 
 			x1, x2 = self.crop_lane(current_working_lane)
 			image = image[:,x1:x2]
 			image = cv2.resize(image, None, fx=self.resize_camera, fy=self.resize_camera)
@@ -354,7 +355,7 @@ class Streaming(Thread):
 					is_container = True
 					Container_position = element['Position']
 					try:
-						result_door = processing_door_v2(image, Container_position, self.net, self.meta, self.door_model)
+						result_door = processing_door_v2(image, Container_position, self.door_model)
 					except:
 						print('Exception door detection')
 
@@ -373,6 +374,7 @@ class Streaming(Thread):
 						states['truck_Id'] =  element['Truck ID'][0]
 				if element['Object']  == 'Spreader':
 					is_spread = True
+					print(element)
 					
 
 			if is_truck == False:
@@ -404,21 +406,7 @@ class Streaming(Thread):
 				else:
 					self.push_door_data(result_door, is_huy = False)
 
-				if len(door_statistic) == 1:
-					print(door_statistic)
-					self.sent_door_to_Vu(door_statistic[0])
-					old_value_door = door_statistic[0]
-				elif len(door_statistic) > 1:
-					count_true_door = door_statistic.count(True)
-					count_false_door = door_statistic.count(False)
-					if count_false_door > count_true_door and old_value_door != False:
-						old_value_door = False
-						self.sent_door_to_Vu(is_door = False)
-						print(door_statistic)
-					if count_true_door > count_false_door and old_value_door != True:
-						old_value_door = True
-						self.sent_door_to_Vu(is_door = True)
-						print(door_statistic)
+				self.check_and_sent_door()
 			
 
 			result = self.check_sent_result()
@@ -428,7 +416,9 @@ class Streaming(Thread):
 			if self.check_change(result, before_result) and self.y_truck_head >= self.MIN_Y_TRUCK_HEAD:
 				before_result = result
 				############################### SENT TO VU ##################
-				print('sent to VU')
+				if len(door_statistic) > 0 and states['is_sent_door_in_center'] == False:
+					states['is_sent_door_in_center']  = True
+					self.sent_door_to_Vu(old_value_door)
 				result['truck_image'] = 'test.jpg'
 				sio.emit('top_cameras_info', result)
 				############################### SENT TO VU ##################
@@ -477,6 +467,25 @@ class Streaming(Thread):
 		print(result_Vu)
 		sio.emit('top_cameras_info', result_Vu)
 
+	def check_and_sent_door(self):
+		global door_statistic, old_value_door
+		if len(door_statistic) == 1:
+			print(door_statistic)
+			self.sent_door_to_Vu(door_statistic[0])
+			old_value_door = door_statistic[0]
+		elif len(door_statistic) > 1:
+			count_true_door = door_statistic.count(True)
+			count_false_door = door_statistic.count(False)
+			if count_false_door > count_true_door and old_value_door != False:
+				old_value_door = False
+				print(door_statistic)
+				self.sent_door_to_Vu(is_door = False)
+			if count_true_door > count_false_door and old_value_door != True:
+				old_value_door = True
+				print(door_statistic)
+				self.sent_door_to_Vu(is_door = True)
+
+
 	def check_is_truck_id(self, truck_id):
 		list_string_number = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] 
 		if truck_id[0] not in list_string_number and truck_id[1] in list_string_number and truck_id[2] in list_string_number:
@@ -484,6 +493,7 @@ class Streaming(Thread):
 		return False
 
 	def process_streaming(self):
+		global states, door_statistic, old_value_door, count_n_frame
 		self.default_state()
 		print(states)
 		sio.emit('top_cameras_info', self.check_sent_result())
@@ -496,14 +506,14 @@ class Streaming(Thread):
 
 		image = None
 		image = self.video_capture_cam3.read()
-		# self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 16
-		self.MIN_Y_TRUCK_HEAD = image.shape[0] // 2 * self.resize_camera + image.shape[0] // 8 * self.resize_camera
-		# count = 0
+		# self.MIN_Y_TRUCK_HEAD = image.shape[0] // 4 + image.shape[0] // 14
+		self.MIN_Y_TRUCK_HEAD = (image.shape[0] / 2 * self.resize_camera) + ((image.shape[0] / 8) * self.resize_camera)
+		count = 0
 		current_second = -1
 		old_second = -1
 		while True: 
 			try:
-			# count += 1
+				count += 1
 				s = time.time()
 				if current_working_lane in [1,2,3]:
 					self.cam_name = 3
@@ -534,7 +544,7 @@ class Streaming(Thread):
 						is_container = True
 						Container_position = element['Position']
 						try:
-							result_door = processing_door_v2(image, Container_position, self.net, self.meta, self.door_model)
+							result_door = processing_door_v2(image, Container_position, self.door_model)
 						except:
 							print('Exception door detection')
 
@@ -582,22 +592,7 @@ class Streaming(Thread):
 						self.push_door_data(result_door, is_huy = True)
 					else:
 						self.push_door_data(result_door, is_huy = False)
-
-					if len(door_statistic) == 1:
-						print(datetime.datetime.now(),door_statistic)
-						self.sent_door_to_Vu(door_statistic[0])
-						old_value_door = door_statistic[0]
-					elif len(door_statistic) > 1:
-						count_true_door = door_statistic.count(True)
-						count_false_door = door_statistic.count(False)
-						if count_false_door > count_true_door and old_value_door != False:
-							old_value_door = False
-							self.sent_door_to_Vu(is_door = False)
-							print(datetime.datetime.now(),door_statistic)
-						if count_true_door > count_false_door and old_value_door != True:
-							old_value_door = True
-							self.sent_door_to_Vu(is_door = True)
-							print(datetime.datetime.now(),door_statistic)
+					self.check_and_sent_door()
 
 				result = self.check_sent_result()
 				if before_result == None:
@@ -606,7 +601,10 @@ class Streaming(Thread):
 				if self.check_change(result, before_result) and self.y_truck_head >= self.MIN_Y_TRUCK_HEAD:
 					before_result = result
 					############################### SENT TO VU ##################
-					print(datetime.datetime.now(),'sent to VU')
+					if len(door_statistic) > 0 and states['is_sent_door_in_center'] == False:
+						states['is_sent_door_in_center']  = True
+						self.sent_door_to_Vu(old_value_door)
+
 					result['truck_image'] = 'test.jpg'
 					sio.emit('top_cameras_info', result)
 					############################### SENT TO VU ##################
@@ -624,6 +622,9 @@ class Streaming(Thread):
 				if states['count_truck_out'] == self.COUNT_TRUCK_OUT and self.y_truck_head >= self.MIN_Y_TRUCK_HEAD:
 					print(datetime.datetime.now(),'Reset default state')
 					self.default_state()
+					
+				if count % 100 == 0:
+					print('time per frame', time.time() - s)
 			except:
 				print('There are something wrong truck id door')
 
